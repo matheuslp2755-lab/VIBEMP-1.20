@@ -32,6 +32,72 @@ interface ForwardedPostProps {
   };
 }
 
+const formatTime = (totalSeconds: number) => {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+};
+
+const AudioPlayer: React.FC<{ src: string }> = ({ src }) => {
+    const audioRef = useRef<HTMLAudioElement>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [duration, setDuration] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
+  
+    const togglePlayPause = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (audioRef.current) {
+            if (isPlaying) {
+                audioRef.current.pause();
+            } else {
+                audioRef.current.play().catch(console.error);
+            }
+        }
+    };
+  
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (audio) {
+            const setAudioData = () => {
+                setDuration(audio.duration);
+                setCurrentTime(audio.currentTime);
+            };
+            const setAudioTime = () => setCurrentTime(audio.currentTime);
+            const onPlay = () => setIsPlaying(true);
+            const onPause = () => setIsPlaying(false);
+
+            audio.addEventListener('loadedmetadata', setAudioData);
+            audio.addEventListener('timeupdate', setAudioTime);
+            audio.addEventListener('play', onPlay);
+            audio.addEventListener('pause', onPause);
+            audio.addEventListener('ended', onPause);
+    
+            return () => {
+                audio.removeEventListener('loadedmetadata', setAudioData);
+                audio.removeEventListener('timeupdate', setAudioTime);
+                audio.removeEventListener('play', onPlay);
+                audio.removeEventListener('pause', onPause);
+                audio.removeEventListener('ended', onPause);
+            };
+        }
+    }, []);
+  
+    const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  
+    return (
+        <div className="flex items-center gap-2 w-60 p-2 text-inherit">
+            <audio ref={audioRef} src={src} preload="metadata" />
+            <button onClick={togglePlayPause} className="flex-shrink-0">
+                {isPlaying ? <PauseIcon className="w-6 h-6" /> : <PlayIcon className="w-6 h-6" />}
+            </button>
+            <div className="w-full bg-zinc-300 dark:bg-zinc-700 rounded-full h-1.5 flex-grow">
+                <div style={{ width: `${progress}%` }} className="bg-current h-1.5 rounded-full"></div>
+            </div>
+            <span className="text-xs font-mono flex-shrink-0">{formatTime(duration > 0 ? currentTime : 0)}</span>
+        </div>
+    );
+};
+
 const ForwardedPost: React.FC<ForwardedPostProps> = ({ content }) => {
   return (
     <div className="p-2">
@@ -65,7 +131,7 @@ interface Message {
         text: string;
     };
     mediaUrl?: string;
-    mediaType?: 'image' | 'video' | 'forwarded_post';
+    mediaType?: 'image' | 'video' | 'forwarded_post' | 'audio';
     forwardedPostData?: {
         postId: string;
         imageUrl: string;
@@ -147,6 +213,24 @@ const Spinner: React.FC = () => (
     </svg>
 );
 
+const MicrophoneIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5a6 6 0 00-12 0v1.5a6 6 0 006 6zM12 12.75V18.75m0 0A3.75 3.75 0 0015.75 15h.375m-7.5 0h.375a3.75 3.75 0 003.375-3.375V9.375" />
+    </svg>
+);
+  
+const PlayIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+        <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.647c1.295.742 1.295 2.545 0 3.286L7.279 20.99c-1.25.722-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
+    </svg>
+);
+
+const PauseIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+        <path fillRule="evenodd" d="M6.75 5.25a.75.75 0 01.75.75v12a.75.75 0 01-1.5 0V6a.75.75 0 01.75-.75zm9 0a.75.75 0 01.75.75v12a.75.75 0 01-1.5 0V6a.75.75 0 01.75-.75z" clipRule="evenodd" />
+    </svg>
+);
+
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onBack }) => {
     const { t } = useLanguage();
@@ -165,7 +249,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onBack }) => {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState('');
     const [viewingMedia, setViewingMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
-    
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
+
     type AnimationState = 'idle' | 'forming' | 'settling';
     const [animationState, setAnimationState] = useState<AnimationState>('idle');
     const [animationMessage, setAnimationMessage] = useState('');
@@ -179,6 +265,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onBack }) => {
     const unsubUserStatusRef = useRef<(() => void) | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
+    const recordingTimerRef = useRef<number | null>(null);
 
 
     useEffect(() => {
@@ -357,6 +446,107 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onBack }) => {
             setMediaType('image');
             setMediaFile(file);
             setMediaPreview(URL.createObjectURL(file));
+        }
+    };
+
+    const sendAudioMessage = async (audioBlob: Blob) => {
+        if (!currentUser || !conversationId || !otherUser) return;
+        
+        setIsUploading(true);
+        setUploadError('');
+      
+        const conversationRef = doc(db, 'conversations', conversationId);
+        const messagesRef = collection(conversationRef, 'messages');
+        const recipientNotificationRef = doc(collection(db, 'users', otherUser.id, 'notifications'));
+      
+        try {
+            const uploadRef = storageRef(storage, `chat_audio/${conversationId}/${Date.now()}.webm`);
+            await uploadBytes(uploadRef, audioBlob);
+            const audioUrl = await getDownloadURL(uploadRef);
+    
+            const messageData: any = {
+                senderId: currentUser.uid,
+                text: '',
+                timestamp: serverTimestamp(),
+                mediaUrl: audioUrl,
+                mediaType: 'audio',
+            };
+    
+            const conversationSnap = await getDoc(conversationRef);
+            const currentData = conversationSnap.data();
+            let newStreak = currentData?.crystal?.streak || 1;
+    
+            const lastMessageUpdate: any = {
+                text: '',
+                senderId: currentUser.uid,
+                timestamp: serverTimestamp(),
+                mediaType: 'audio',
+            };
+    
+            const batch = writeBatch(db);
+            const newMessageRef = doc(messagesRef);
+            batch.set(newMessageRef, messageData);
+            batch.update(conversationRef, { 
+                lastMessage: lastMessageUpdate, 
+                timestamp: serverTimestamp(),
+                'crystal.lastInteractionAt': serverTimestamp(),
+                'crystal.level': 'BRILHANTE',
+                'crystal.streak': newStreak
+            });
+            batch.set(recipientNotificationRef, {
+                type: 'message',
+                fromUserId: currentUser.uid,
+                fromUsername: currentUser.displayName,
+                fromUserAvatar: currentUser.photoURL,
+                conversationId: conversationId,
+                timestamp: serverTimestamp(),
+                read: false,
+            });
+            await batch.commit();
+        } catch (error) {
+            console.error("Error sending audio message:", error);
+            setUploadError(t('messages.media.uploadError'));
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleStartRecording = async () => {
+        if (isRecording) return;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorderRef.current = new MediaRecorder(stream);
+            audioChunksRef.current = [];
+
+            mediaRecorderRef.current.ondataavailable = (event) => {
+                audioChunksRef.current.push(event.data);
+            };
+
+            mediaRecorderRef.current.onstop = () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                sendAudioMessage(audioBlob);
+                stream.getTracks().forEach(track => track.stop()); // Stop microphone
+            };
+
+            mediaRecorderRef.current.start();
+            setIsRecording(true);
+            recordingTimerRef.current = window.setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+        } catch (error) {
+            console.error("Error starting recording:", error);
+            setUploadError("Could not start recording. Please check microphone permissions.");
+        }
+    };
+
+    const handleStopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            if (recordingTimerRef.current) {
+                clearInterval(recordingTimerRef.current);
+            }
+            setIsRecording(false);
+            setRecordingTime(0);
         }
     };
 
@@ -598,6 +788,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onBack }) => {
                                 )}
                                 {msg.mediaType === 'forwarded_post' && msg.forwardedPostData ? (
                                     <ForwardedPost content={msg.forwardedPostData} />
+                                ) : msg.mediaType === 'audio' && msg.mediaUrl ? (
+                                    <AudioPlayer src={msg.mediaUrl} />
                                 ) : msg.mediaUrl ? (
                                     <div className="p-1 cursor-pointer" onClick={() => setViewingMedia({url: msg.mediaUrl!, type: msg.mediaType! as 'image' | 'video'})}>
                                         {msg.mediaType === 'image' ? (
@@ -677,32 +869,59 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId, onBack }) => {
                     </div>
                 )}
                 <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                     <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*,video/*" className="hidden" />
-                     <button 
-                        type="button" 
-                        onClick={() => fileInputRef.current?.click()} 
-                        disabled={isUploading}
-                        className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-sky-500 dark:hover:text-sky-400"
-                        aria-label={t('messages.media.select')}
-                    >
-                        <PlusCircleIcon className="w-7 h-7" />
-                    </button>
-                     <input 
-                        ref={inputRef}
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder={t('messages.messagePlaceholder')}
-                        disabled={isUploading}
-                        className={`w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 py-2 pl-4 pr-4 text-sm focus:outline-none focus:border-sky-500 ${replyingTo || mediaPreview ? 'rounded-b-full rounded-t-none' : 'rounded-full'}`}
-                    />
-                    <button 
-                        type="submit" 
-                        disabled={(!newMessage.trim() && !mediaFile) || isUploading} 
-                        className="text-sky-500 font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed px-2"
-                    >
-                        {isUploading ? <Spinner /> : t('messages.send')}
-                    </button>
+                    {isRecording ? (
+                        <div className="flex items-center justify-between w-full bg-zinc-100 dark:bg-zinc-900 rounded-full px-4 py-2">
+                            <div className="flex items-center gap-2 text-red-500">
+                                <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                                <span className="text-sm font-mono">{formatTime(recordingTime)}</span>
+                                <span className="text-sm hidden sm:inline">{t('messages.recording')}</span>
+                            </div>
+                            <button type="button" onClick={handleStopRecording} className="text-sky-500 font-semibold text-sm px-2">
+                                {t('messages.send')}
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                             <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*,video/*" className="hidden" />
+                             <button 
+                                type="button" 
+                                onClick={() => fileInputRef.current?.click()} 
+                                disabled={isUploading}
+                                className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-sky-500 dark:hover:text-sky-400"
+                                aria-label={t('messages.media.select')}
+                            >
+                                <PlusCircleIcon className="w-7 h-7" />
+                            </button>
+                             <input 
+                                ref={inputRef}
+                                type="text"
+                                value={newMessage}
+                                onChange={(e) => setNewMessage(e.target.value)}
+                                placeholder={t('messages.messagePlaceholder')}
+                                disabled={isUploading}
+                                className={`w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 py-2 pl-4 pr-4 text-sm focus:outline-none focus:border-sky-500 ${replyingTo || mediaPreview ? 'rounded-b-full rounded-t-none' : 'rounded-full'}`}
+                            />
+                            { (newMessage.trim() || mediaFile) ? (
+                                <button 
+                                    type="submit" 
+                                    disabled={isUploading} 
+                                    className="text-sky-500 font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed px-2"
+                                >
+                                    {isUploading ? <Spinner /> : t('messages.send')}
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={handleStartRecording}
+                                    disabled={isUploading}
+                                    className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-sky-500 dark:hover:text-sky-400 disabled:opacity-50"
+                                    aria-label="Record voice message"
+                                >
+                                    <MicrophoneIcon className="w-7 h-7" />
+                                </button>
+                            )}
+                        </>
+                    )}
                 </form>
             </div>
             {showDeleteConfirm.open && (

@@ -155,6 +155,7 @@
     "yourMessages": "Your Messages",
     "sendPrivate": "Send private photos and messages to a friend.",
     "seen": "Seen",
+    "recording": "Recording...",
     "replyingToSelf": "Replying to yourself",
     "replyingToOther": "Replying to {username}",
     "messagePlaceholder": "Message...",
@@ -166,6 +167,7 @@
     "media": {
       "photo": "Photo",
       "video": "Video",
+      "audio": "Voice message",
       "select": "Attach media",
       "uploadError": "Failed to upload media.",
       "videoTooLong": "Video cannot be longer than 30 seconds.",

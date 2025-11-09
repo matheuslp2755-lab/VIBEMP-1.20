@@ -158,6 +158,7 @@ const messages = {
     "yourMessages": "Suas Mensagens",
     "sendPrivate": "Envie fotos e mensagens privadas para um amigo.",
     "seen": "Visto",
+    "recording": "Gravando...",
     "replyingToSelf": "Respondendo a si mesmo",
     "replyingToOther": "Respondendo a {username}",
     "messagePlaceholder": "Mensagem...",
@@ -166,6 +167,16 @@ const messages = {
     "deleteBody": "Tem certeza que deseja excluir esta mensagem? Esta ação não pode ser desfeita.",
     "newMessageTitle": "Nova Mensagem",
     "searchUsers": "Procurar usuários...",
+    "media": {
+      "photo": "Foto",
+      "video": "Vídeo",
+      "audio": "Mensagem de voz",
+      "select": "Anexar mídia",
+      "uploadError": "Falha ao enviar mídia.",
+      "videoTooLong": "O vídeo não pode ter mais de 30 segundos.",
+      "cancelUpload": "Cancelar envio",
+      "viewMedia": "Ver mídia"
+    },
     "forwardedPost": "Encaminhou uma publicação"
   },
   "forwardModal": {

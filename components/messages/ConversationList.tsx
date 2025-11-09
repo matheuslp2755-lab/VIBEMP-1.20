@@ -14,7 +14,7 @@ interface Conversation {
     lastMessage?: {
         text: string;
         timestamp: any;
-        mediaType?: 'image' | 'video';
+        mediaType?: 'image' | 'video' | 'audio' | 'forwarded_post';
         // FIX: Added senderId to the lastMessage type to match the data structure and resolve a TypeScript error.
         senderId: string;
     };
@@ -132,13 +132,18 @@ const ConversationList: React.FC<ConversationListProps> = ({ onSelectConversatio
         
         const sender = lm.senderId === currentUser?.uid ? `${t('common.you')}: ` : '';
 
-        if (lm.mediaType === 'image') {
-            return `${sender}📷 ${lm.text || t('messages.media.photo')}`;
+        switch (lm.mediaType) {
+            case 'image':
+                return `${sender}📷 ${lm.text || t('messages.media.photo')}`;
+            case 'video':
+                return `${sender}📹 ${lm.text || t('messages.media.video')}`;
+            case 'audio':
+                return `${sender}🎤 ${t('messages.media.audio')}`;
+            case 'forwarded_post':
+                 return `${sender}↪️ ${t('messages.forwardedPost')}`;
+            default:
+                return lm.text ? `${sender}${lm.text}` : '...';
         }
-        if (lm.mediaType === 'video') {
-            return `${sender}📹 ${lm.text || t('messages.media.video')}`;
-        }
-        return lm.text ? `${sender}${lm.text}` : '...';
     }
 
 
